@@ -52,34 +52,7 @@
 import sys, os, re, time, argparse
 from datetime import datetime
 from array import array
-try:
-  if sys.version_info[0] < 3: raise Exception("prefer usb.core with python-2.x because of https://github.com/jnweiger/led-badge-ls32/issues/9")
-  import pyhidapi
-  pyhidapi.hid_init()
-  have_pyhidapi = True
-except:
-  have_pyhidapi = False
-  try:
-    import usb.core
-  except:
-    print("ERROR: Need the pyhidapi or usb.core module.")
-    if sys.platform == "darwin":
-      print("""Please try
-  pip3 install pyhidapi
-  pip install pyhidapi
-  brew install hidapi""")
-    elif sys.platform == "linux":
-      print("""Please try
-  sudo pip3 install pyhidapi
-  sudo pip install pyhidapi
-  sudo apt-get install libhidapi-hidraw0
-  sudo ln -s /usr/lib/x86_64-linux-gnu/libhidapi-hidraw.so.0  /usr/local/lib/
-or
-  sudo apt-get install python3-usb""")
-    else:       # windows?
-      print("""Please with Linux or MacOS or help us implement support for """ + sys.platform)
-    sys.exit(1)
-
+import hid
 
 __version = "0.12"
 
@@ -449,33 +422,14 @@ parser.add_argument('--mode-help', action='version', help=argparse.SUPPRESS, ver
  (No "rotation" or "smoothing"(?) effect can be expected, though)
 """ % sys.argv[0])
 args = parser.parse_args()
-if have_pyhidapi:
-  devinfo = pyhidapi.hid_enumerate(0x0416, 0x5020)
-  #dev = pyhidapi.hid_open(0x0416, 0x5020)
-else:
-  dev = usb.core.find(idVendor=0x0416, idProduct=0x5020)
 
-if have_pyhidapi:
-  if devinfo:
-    dev = pyhidapi.hid_open_path(devinfo[0].path)
-    print("using [%s %s] int=%d page=%s via pyHIDAPI" % (devinfo[0].manufacturer_string, devinfo[0].product_string, devinfo[0].interface_number, devinfo[0].usage_page))
-  else:
-    print("No led tag with vendorID 0x0416 and productID 0x5020 found.")
-    print("Connect the led tag and run this tool as root.")
-    sys.exit(1)
+devinfo = hid.enumerate(0x0416, 0x5020)
+if devinfo:
+  print("using [%s %s] int=%d page=%s via pyHIDAPI" % (devinfo[0]["manufacturer_string"], devinfo[0]["product_string"], devinfo[0]["interface_number"], devinfo[0]["usage_page"]))
 else:
-  if dev is None:
-    print("No led tag with vendorID 0x0416 and productID 0x5020 found.")
-    print("Connect the led tag and run this tool as root.")
-    sys.exit(1)
-  try:
-    # win32: NotImplementedError: is_kernel_driver_active
-    if dev.is_kernel_driver_active(0):
-      dev.detach_kernel_driver(0)
-  except:
-    pass
-  dev.set_configuration()
-  print("using [%s %s] bus=%d dev=%d" % (dev.manufacturer, dev.product, dev.bus, dev.address))
+  print("No led tag with vendorID 0x0416 and productID 0x5020 found.")
+  print("Connect the led tag and run this tool as root.")
+  sys.exit(1)
 
 if args.preload:
   for file in args.preload:
@@ -515,12 +469,5 @@ if len(buf) > 8192:
   print ("Writing more than 8192 bytes damages the display!")
   sys.exit(1)
 
-if have_pyhidapi:
-  pyhidapi.hid_write(dev, buf)
-else:
-  for i in range(int(len(buf)/64)):
-    time.sleep(0.1)
-    dev.write(1, buf[i*64:i*64+64])
-
-if have_pyhidapi:
-  pyhidapi.hid_close(dev)
+with hid.Device(path=devinfo[0]["path"]) as dev:
+  dev.write(buf.tobytes())
