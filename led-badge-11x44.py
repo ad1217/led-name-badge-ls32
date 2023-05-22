@@ -468,6 +468,8 @@ if needpadding:
 if len(buf) > 8192:
   print ("Writing more than 8192 bytes damages the display!")
   sys.exit(1)
+else:
+  print(f"Writing {len(buf)} bytes")
 
 with hid.Device(path=devinfo[0]["path"]) as dev:
   dev.write(buf.tobytes())
