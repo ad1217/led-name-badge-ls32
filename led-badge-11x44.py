@@ -361,7 +361,7 @@ def header(lengths, speeds, modes, blink, ants, brightness=100):
   h = list(proto_header)
 
   if brightness <= 25:
-    h[5] = 0x40
+    h[5] = 0x30
   elif brightness <= 50:
     h[5] = 0x20
   elif brightness <= 75:
